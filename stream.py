@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_PATH = BASE_DIR / "notebook_des_modeles" / "models" / "random_forest_model.joblib"
 
-# Chargement sécurisé du modèle avec joblib
+# Chargement sécurisé du modèle
 model = joblib.load(MODEL_PATH)
 
 st.title("🛡️ Détection d'Intrusion IA")
@@ -37,7 +37,7 @@ unusual_time_access = st.selectbox("Unusual Time Access", ["Yes", "No"])
 
 if st.button("🔍 Prédire"):
 
-    # Création du DataFrame initial
+    # 1. Création du DataFrame initial avec les valeurs brutes
     data = pd.DataFrame([{
         "network_packet_size": network_packet_size,
         "protocol_type": protocol_type,
@@ -50,13 +50,32 @@ if st.button("🔍 Prédire"):
         "unusual_time_access": unusual_time_access
     }])
 
-    # CORRECTION CRITIQUE : Aligner l'ordre des colonnes sur le modèle
-    if hasattr(model, "feature_names_in_"):
-        data = data[model.feature_names_in_]
+    # Copie pour appliquer les transformations numériques
+    data_encoded = data.copy()
 
-    # Exécution des prédictions
-    prediction = model.predict(data)[0]
-    proba = model.predict_proba(data)[0]
+    # Si le modèle attend la variable binaire "unusual_time_access" sous forme 0/1
+    if hasattr(model, "feature_names_in_") and "unusual_time_access" in model.feature_names_in_:
+        data_encoded["unusual_time_access"] = data_encoded["unusual_time_access"].map({"Yes": 1, "No": 0})
+
+    # 2. Application du One-Hot Encoding (génère les colonnes protocol_type_TCP, etc.)
+    # dtype=int force l'écriture en 0/1 plutôt qu'en True/False (mieux digéré par Scikit-Learn)
+    data_encoded = pd.get_dummies(data_encoded, dtype=int)
+
+    # 3. ALIGNEMENT DYNAMIQUE CRITIQUE
+    if hasattr(model, "feature_names_in_"):
+        # On ajoute à 0 toutes les colonnes requises par le modèle mais absentes de l'input (ex: browser_type_Unknown)
+        for col in model.feature_names_in_:
+            if col not in data_encoded.columns:
+                data_encoded[col] = 0
+        
+        # On ordonne et filtre le DataFrame pour correspondre EXACTEMENT aux exigences du modèle
+        data_final = data_encoded[model.feature_names_in_]
+    else:
+        data_final = data_encoded
+
+    # Exécution des prédictions sur les données encodées et alignées
+    prediction = model.predict(data_final)[0]
+    proba = model.predict_proba(data_final)[0]
 
     st.write("---")
     st.subheader("📈 Résultat de l'analyse")
@@ -69,39 +88,32 @@ if st.button("🔍 Prédire"):
         st.write(f"**Probabilité de fiabilité :** {proba[0]*100:.2f}%")
 
     # -------------------
-    # SHAP EXPLANATION (Imbriqué ici pour éviter le NameError)
+    # SHAP EXPLANATION
     # -------------------
     st.write("---")
     st.subheader("🧬 Explication de la décision (SHAP)")
 
     try:
-        # 1. Isoler le modèle et le préprocesseur du Pipeline
-        modele_final = model.named_steps["model"]
-        preprocessor = model.named_steps["preprocessor"]
+        # Si le modèle est un Pipeline, on isole le sous-modèle final
+        if hasattr(model, "named_steps") and "model" in model.named_steps:
+            modele_final = model.named_steps["model"]
+        else:
+            modele_final = model
 
-        # 2. Transformer les données utilisateur
-        transformed_data = preprocessor.transform(data)
-
-        # 3. Récupérer les noms de colonnes post-encodage (ex: OneHotEncoding)
-        feature_names = preprocessor.get_feature_names_out()
-
-        # 4. Reconstruire le DataFrame encodé
-        transformed_df = pd.DataFrame(transformed_data, columns=feature_names)
-
-        # 5. Calculer les valeurs SHAP
+        # Calcul des valeurs SHAP directement sur les données finalisées
         explainer = shap.Explainer(modele_final)
-        shap_values = explainer(transformed_df)
+        shap_values = explainer(data_final)
 
-        # 6. Génération et affichage du graphique en cascade (Waterfall)
+        # Génération graphique
         fig, ax = plt.subplots(figsize=(10, 5))
         shap.plots.waterfall(shap_values[0], show=False)
         plt.tight_layout()
         st.pyplot(fig)
 
-        # Nettoyage
+        # Libération de la mémoire
         plt.clf()
         plt.close(fig)
         
     except Exception as e:
-        st.warning("Impossible de charger l'explication SHAP pour le moment.")
-        st.info(f"Détail technique : {e}")
+        st.warning("Graphique SHAP indisponible pour cette prédiction.")
+        st.info(f"Détail technique SHAP : {e}")
