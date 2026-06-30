@@ -87,7 +87,7 @@ if st.button("🔍 Prédire"):
         st.success("✅ Pas d'attaque (Trafic Sain)")
         st.write(f"**Probabilité de fiabilité :** {proba[0]*100:.2f}%")
 
-    # -------------------
+   # -------------------
     # SHAP EXPLANATION
     # -------------------
     st.write("---")
@@ -104,9 +104,14 @@ if st.button("🔍 Prédire"):
         explainer = shap.Explainer(modele_final)
         shap_values = explainer(data_final)
 
+        # CORRECTION CRITIQUE : Sélectionner l'échantillon 0 ET la classe prédite
+        # Structure de shap_values : [index_echantillon, index_variable, index_classe]
+        classe_a_expliquer = int(prediction)  # Prends 0 (Sain) ou 1 (Attaque) dynamiquement
+        shap_values_single = shap_values[0, :, classe_a_expliquer]
+
         # Génération graphique
         fig, ax = plt.subplots(figsize=(10, 5))
-        shap.plots.waterfall(shap_values[0], show=False)
+        shap.plots.waterfall(shap_values_single, show=False)
         plt.tight_layout()
         st.pyplot(fig)
 
