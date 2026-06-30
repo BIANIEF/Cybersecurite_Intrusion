@@ -1,12 +1,12 @@
 import streamlit as st
 import pandas as pd
-import pickle
+import joblib
 import shap
 import matplotlib.pyplot as plt
 
 # chargement modèle
-with open("notebook_des_modeles/models/random_forest_model.pkl", "rb") as f:
-    model = pickle.load(f)
+with open("notebook_des_modeles/models/random_forest_model.joblib", "rb") as f:
+    model = joblib.load(f)
 
 st.title("🛡️ Détection d'Intrusion IA")
 
