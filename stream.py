@@ -87,38 +87,62 @@ if st.button("🔍 Prédire"):
         st.success("✅ Pas d'attaque (Trafic Sain)")
         st.write(f"**Probabilité de fiabilité :** {proba[0]*100:.2f}%")
 
-   # -------------------
-    # SHAP EXPLANATION
+  # -------------------
+    # EXPLICATION TEXTUELLE (SHAP)
     # -------------------
     st.write("---")
-    st.subheader("🧬 Explication de la décision (SHAP)")
+    st.subheader("📝 Rapport d'analyse de l'IA")
 
     try:
-        # Si le modèle est un Pipeline, on isole le sous-modèle final
+        # 1. Isoler le sous-modèle final
         if hasattr(model, "named_steps") and "model" in model.named_steps:
             modele_final = model.named_steps["model"]
         else:
             modele_final = model
 
-        # Calcul des valeurs SHAP directement sur les données finalisées
+        # 2. Calculer les valeurs SHAP
         explainer = shap.Explainer(modele_final)
         shap_values = explainer(data_final)
 
-        # CORRECTION CRITIQUE : Sélectionner l'échantillon 0 ET la classe prédite
-        # Structure de shap_values : [index_echantillon, index_variable, index_classe]
-        classe_a_expliquer = int(prediction)  # Prends 0 (Sain) ou 1 (Attaque) dynamiquement
+        # 3. Isoler les impacts pour la classe prédite
+        classe_a_expliquer = int(prediction)
         shap_values_single = shap_values[0, :, classe_a_expliquer]
 
-        # Génération graphique
-        fig, ax = plt.subplots(figsize=(10, 5))
-        shap.plots.waterfall(shap_values_single, show=False)
-        plt.tight_layout()
-        st.pyplot(fig)
+        # 4. Créer un DataFrame pour trier les variables par importance réelle
+        importance_df = pd.DataFrame({
+            'Variable': data_final.columns,
+            'Impact': shap_values_single.values,
+            'Valeur_Saisie': data_final.iloc[0].values
+        })
 
-        # Libération de la mémoire
-        plt.clf()
-        plt.close(fig)
+        # On calcule l'impact absolu pour avoir les facteurs majeurs (qu'ils poussent vers le vrai ou le faux)
+        importance_df['Impact_Absolu'] = importance_df['Impact'].abs()
+        importance_df = importance_df.sort_values(by='Impact_Absolu', ascending=False)
+
+        # On isole le top 3 des fonctionnalités clés
+        top_3 = importance_df.head(3)
+
+        # 5. Génération dynamique du paragraphe de synthèse
+        statut_prediction = "DÉTECTION D'UNE INTRUSION" if prediction == 1 else "TRAFIC LÉGITIME"
         
+        paragraphe = f"""
+        L'algorithme a classé cet événement comme un **{statut_prediction}** avec un niveau de confiance de **{proba[classe_a_expliquer]*100:.1f}%**. 
+        Après analyse approfondie des caractéristiques du signal, cette décision s'explique principalement par la combinaison de trois facteurs majeurs :
+        """
+        st.write(paragraphe)
+
+        # Génération des détails pour le top 3 sous forme de puces narratives
+        for _, row in top_3.iterrows():
+            nom_var = row['Variable'].replace('_', ' ').title()
+            valeur = row['Valeur_Saisie']
+            
+            if row['Impact'] > 0:
+                action = "a fortement **conforté** l'évaluation du modèle dans son choix actuel"
+            else:
+                action = "a agi comme un contre-poids, mais n'a pas suffi à inverser la tendance"
+
+            st.write(f"* **{nom_var}** (Valeur actuelle : `{valeur}`) : Ce paramètre {action} (poids SHAP : `{row['Impact']:.3f}`).")
+
     except Exception as e:
-        st.warning("Graphique SHAP indisponible pour cette prédiction.")
-        st.info(f"Détail technique SHAP : {e}")
+        st.warning("Génération du rapport textuel indisponible pour cette prédiction.")
+        st.info(f"Détail technique : {e}")
