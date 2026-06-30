@@ -5,7 +5,7 @@ import shap
 import matplotlib.pyplot as plt
 
 # chargement modèle
-with open("modele_intrusion.pkl", "rb") as f:
+with open("random_forest_model.pkl", "rb") as f:
     model = pickle.load(f)
 
 st.title("🛡️ Détection d'Intrusion IA")
@@ -21,7 +21,7 @@ ip_reputation_score = st.number_input("IP Reputation Score", min_value=0.0, max_
 failed_logins = st.number_input("Failed Logins", min_value=0)
 
 protocol_type = st.selectbox("Protocol Type", ["TCP", "UDP", "ICMP"])
-encryption_used = st.selectbox("Encryption Used", ["Yes", "No"])
+encryption_used = st.selectbox("Encryption Used", ["AES", "DES"])
 browser_type = st.selectbox("Browser Type", ["Chrome", "Firefox", "Edge", "Safari"])
 unusual_time_access = st.selectbox("Unusual Time Access", ["Yes", "No"])
 
