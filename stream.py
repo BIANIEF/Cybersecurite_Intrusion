@@ -5,7 +5,7 @@ import shap
 import matplotlib.pyplot as plt
 
 # chargement modèle
-with open("random_forest_model.pkl", "rb") as f:
+with open("notebook_des_modeles/models/random_forest_model.pkl", "rb") as f:
     model = pickle.load(f)
 
 st.title("🛡️ Détection d'Intrusion IA")
