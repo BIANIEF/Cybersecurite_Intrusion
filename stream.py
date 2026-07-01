@@ -7,11 +7,16 @@ import joblib
 import shap
 import matplotlib.pyplot as plt
 
-# 1. Gestion dynamique des chemins (Modèle ET Scaler)
+# BASE_DIR est déjà le dossier racine (CYBERSECURITE_INTRUSION)
 BASE_DIR = Path(__file__).resolve().parent
-# Ajuste le chemin selon ton arborescence exacte
-MODEL_PATH = BASE_DIR / "models" / "random_forest_model.joblib"
-SCALER_PATH = BASE_DIR / "models" / "scaler.joblib"
+
+# Chemin explicite vers le sous-dossier
+MODEL_PATH = BASE_DIR / "notebook_des_modeles" / "models" / "random_forest_model.joblib"
+SCALER_PATH = BASE_DIR / "notebook_des_modeles" / "models" / "scaler.joblib"
+
+# Chargement
+model = joblib.load(MODEL_PATH)
+scaler = joblib.load(SCALER_PATH)
 
 # Chargement sécurisé
 model = joblib.load(MODEL_PATH)
