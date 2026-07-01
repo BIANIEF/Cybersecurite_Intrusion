@@ -106,27 +106,32 @@ if st.button("🔍 Prédire"):
         st.write(f"**Probabilité de fiabilité :** {proba[0]*100:.2f}%")
 
     # -------------------
-    # EXPLICATION TEXTUELLE (SHAP)
+    # EXPLICATION TEXTUELLE (SHAP) - VERSION CORRIGÉE
     # -------------------
     st.write("---")
     st.subheader("📝 Rapport d'analyse de l'IA")
 
     try:
-        # Optimisation : Utilisation de TreeExplainer plus performant pour Random Forest
+        # 1. Utiliser TreeExplainer (optimisé pour Random Forest)
         explainer = shap.TreeExplainer(model)
         
-        # SHAP renvoie parfois des listes selon la version, on gère les dimensions
-        shap_values = explainer.shap_values(data_final)
+        # 2. On s'assure que data_final est bien une matrice 2D (1 ligne, N colonnes)
+        # .values force la conversion en tableau numpy pur, ce qui résout souvent l'erreur
+        shap_values = explainer.shap_values(data_final.values)
         
-        # Sur un Random Forest binaire, shap_values est souvent une liste [sain, attaque]
+        # 3. Gestion de la structure de retour de SHAP
+        # Si le modèle est binaire, shap_values est une liste de deux arrays (classe 0, classe 1)
         if isinstance(shap_values, list):
-            shap_values_single = shap_values[int(prediction)][0]
+            # On prend l'index de la classe prédite (0 ou 1)
+            shap_values_to_use = shap_values[int(prediction)][0]
         else:
-            shap_values_single = shap_values[0]
+            # Sinon, c'est un seul array
+            shap_values_to_use = shap_values[0]
 
+        # 4. Création du DataFrame d'importance
         importance_df = pd.DataFrame({
             'Variable': data_final.columns,
-            'Impact': shap_values_single,
+            'Impact': shap_values_to_use,
             'Valeur_Saisie': data_final.iloc[0].values
         })
 
@@ -134,26 +139,19 @@ if st.button("🔍 Prédire"):
         importance_df = importance_df.sort_values(by='Impact_Absolu', ascending=False)
         top_3 = importance_df.head(3)
 
+        # 5. Affichage
         statut_prediction = "DÉTECTION D'UNE INTRUSION" if prediction == 1 else "TRAFIC LÉGITIME"
-        classe_a_expliquer = int(prediction)
-        
         paragraphe = f"""
-        L'algorithme a classé cet événement comme un **{statut_prediction}** avec un niveau de confiance de **{proba[classe_a_expliquer]*100:.1f}%**. 
-        Après analyse approfondie des caractéristiques du signal, cette décision s'explique principalement par la combinaison de trois facteurs majeurs :
+        L'algorithme a classé cet événement comme un **{statut_prediction}** (Confiance : {proba[int(prediction)]*100:.1f}%). 
+        Voici les 3 facteurs ayant eu le plus d'influence sur cette décision :
         """
         st.write(paragraphe)
 
         for _, row in top_3.iterrows():
             nom_var = row['Variable'].replace('_', ' ').title()
-            valeur = round(row['Valeur_Saisie'], 4) if isinstance(row['Valeur_Saisie'], float) else row['Valeur_Saisie']
-            
-            if row['Impact'] > 0:
-                action = "a fortement **conforté** l'évaluation du modèle dans son choix actuel"
-            else:
-                action = "a agi comme un contre-poids, mais n'a pas suffi à inverser la tendance"
-
-            st.write(f"* **{nom_var}** (Valeur traitée : `{valeur}`) : Ce paramètre {action} (poids SHAP : `{row['Impact']:.3f}`).")
+            valeur = round(float(row['Valeur_Saisie']), 4)
+            st.write(f"* **{nom_var}** : Impact de `{row['Impact']:.3f}` (Valeur : `{valeur}`).")
 
     except Exception as e:
-        st.warning("Génération du rapport textuel indisponible pour cette prédiction.")
-        st.info(f"Détail technique : {e}")
+        st.warning("L'explication détaillée est temporairement indisponible.")
+        st.write(f"Détail technique : {e}")
